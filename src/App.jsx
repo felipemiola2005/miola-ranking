@@ -54,13 +54,6 @@ const getMonthLabel = (key) => {
 
 const STORAGE_KEYS = { sales: "miola_sales", barbers: "miola_barbers" };
 
-async function loadFromStorage(key, fallback) {
-  try {
-    const result = await window.storage.get(key);
-    return result ? JSON.parse(result.value) : fallback;
-  } catch { return fallback; }
-}
-
 async function saveToStorage(key, data) {
   try { await window.storage.set(key, JSON.stringify(data)); } catch {}
 }
@@ -323,22 +316,21 @@ export default function App() {
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
 
   useEffect(() => {
+    const unsub1 = window.storage.subscribeToChanges(STORAGE_KEYS.sales, (val) => {
+      try { setSales(JSON.parse(val)); } catch {}
+    });
+    const unsub2 = window.storage.subscribeToChanges(STORAGE_KEYS.barbers, (val) => {
+      try { setBarbers(JSON.parse(val)); } catch {}
+    });
     (async () => {
-      const s = await loadFromStorage(STORAGE_KEYS.sales, []);
-      const b = await loadFromStorage(STORAGE_KEYS.barbers, BARBERS_INITIAL);
-      setSales(s); setBarbers(b); setLoaded(true);
+      const s = await window.storage.get(STORAGE_KEYS.sales);
+      const b = await window.storage.get(STORAGE_KEYS.barbers);
+      if (s) try { setSales(JSON.parse(s.value)); } catch {}
+      if (b) try { setBarbers(JSON.parse(b.value)); } catch {}
+      setLoaded(true);
     })();
+    return () => { unsub1?.(); unsub2?.(); };
   }, []);
-
-  useEffect(() => {
-    if (!currentUser) return;
-    const iv = setInterval(async () => {
-      const s = await loadFromStorage(STORAGE_KEYS.sales, []);
-      const b = await loadFromStorage(STORAGE_KEYS.barbers, BARBERS_INITIAL);
-      setSales(s); setBarbers(b);
-    }, 8000);
-    return () => clearInterval(iv);
-  }, [currentUser]);
 
   const showToast = (msg, type="success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
 
